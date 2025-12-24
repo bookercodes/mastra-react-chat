@@ -1,0 +1,8 @@
+{
+  "name": "mastra-with-ai-sdk-ui",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel dev",
+    "build": "pnpm --recursive build"
+  }
+}
