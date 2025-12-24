@@ -1,6 +1,8 @@
-import { useState, useCallback } from "react";
-import { mastraClient } from "../lib/mastra";
-import type { ChunkType } from '@mastra/core/stream'
+import { useState, useCallback, useRef } from "react";
+import { MastraClient } from "@mastra/client-js";
+import type { ChunkType } from "@mastra/core/stream";
+
+const BASE_URL = import.meta.env.VITE_MASTRA_API_URL || "http://localhost:4111";
 
 // Discriminated union: each item type has a unique `type` field.
 export type ChatMessage =
@@ -17,10 +19,10 @@ export type ChatMessage =
     }
   | { type: "assistant-text"; runId: string; content: string };
 
-
 export function useMastra(agentName: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleChunk = useCallback(async (c: ChunkType) => {
     // Text delta: append to existing assistant-text item, or create one.
@@ -65,7 +67,8 @@ export function useMastra(agentName: string) {
           msg.type === "tool-call" && msg.toolCallId === c.payload.toolCallId
             ? {
                 ...msg,
-                argsText: msg.argsText + ((c.payload.argsTextDelta as string) || ""),
+                argsText:
+                  msg.argsText + ((c.payload.argsTextDelta as string) || ""),
               }
             : msg,
         ),
@@ -111,17 +114,37 @@ export function useMastra(agentName: string) {
       setMessages((prev) => [...prev, userMessage]);
 
       setIsStreaming(true);
-      const agent = mastraClient.getAgent(agentName);
-      const stream = await agent.stream(content);
-      await stream.processDataStream({ onChunk: handleChunk });
-      setIsStreaming(false);
+      abortControllerRef.current = new AbortController();
+
+      try {
+        const client = new MastraClient({
+          baseUrl: BASE_URL,
+          abortSignal: abortControllerRef.current.signal,
+        });
+        const agent = client.getAgent(agentName);
+        const stream = await agent.stream(content, {
+          memory: {
+            thread: "1",
+            resource: "booker",
+          },
+        });
+        await stream.processDataStream({ onChunk: handleChunk });
+      } finally {
+        abortControllerRef.current = null;
+        setIsStreaming(false);
+      }
     },
     [agentName, isStreaming, handleChunk],
   );
+
+  const abort = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
 
   return {
     messages,
     isStreaming,
     sendMessage,
+    abort,
   };
 }
