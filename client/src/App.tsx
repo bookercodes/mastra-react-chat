@@ -27,7 +27,8 @@ import {
 import { useMastra } from "./hooks/useMastra";
 
 function ChatApp() {
-  const { messages, isStreaming, sendMessage, abort } = useMastra("weather-agent");
+  const { messages, isStreaming, sendMessage, abort } =
+    useMastra("weather-agent");
 
   const handleSubmit = async ({ text }: PromptInputMessage) => {
     if (!text.trim() || isStreaming) return;

@@ -124,7 +124,7 @@ export function useMastra(agentName: string) {
         const agent = client.getAgent(agentName);
         const stream = await agent.stream(content, {
           memory: {
-            thread: "1",
+            thread: agentName,
             resource: "booker",
           },
         });
